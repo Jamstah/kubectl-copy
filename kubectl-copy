@@ -1,0 +1,37 @@
+#!/bin/bash
+
+set -o pipefail
+set -o errexit
+set -o nounset
+
+function usage() {
+    if [ ! -z "${1:-}" ]; then
+        echo "$1" > /dev/stderr
+        echo "" > /dev/stderr
+    fi
+    echo "Usage:" > /dev/stderr
+    echo "  copy <getargs...> <target>" > /dev/stderr
+    echo "" > /dev/stderr
+    echo "Arguments:" > /dev/stderr
+    echo "  getargs     Any arguments you would pass to kubectl get to select the right resources" > /dev/stderr
+    echo "  target      The target namespace to copy the resources to" > /dev/stderr
+
+    exit 1
+}
+
+length=$(($#-1))
+
+if [ $length -lt 0 ]; then
+  usage "Must specify a get arguments and a namespace to copy to"
+fi
+
+if [ $length -lt 1 ]; then
+  usage "Must specify a namespace to copy to"
+fi
+
+target="${!#}" # Last argument
+args=("${@:1:$length}") # Other arguments as array
+
+kubectl get "${args[@]}" -o json |
+  jq --arg target "$target" '(.items[].metadata.namespace = $target)? // .metadata.namespace = $target' |
+  kubectl create -f -
